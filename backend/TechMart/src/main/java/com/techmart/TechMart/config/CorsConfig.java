@@ -10,13 +10,13 @@ public class CorsConfig implements WebMvcConfigurer {
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/api/**")
-                .allowedOrigins(
+                .allowedOriginPatterns(
                         "http://localhost:3000",
-                        "https://tech-shop-blond-gamma.vercel.app"
+                        "https://*.vercel.app",
+                        "https://techmart.vn" // nếu sau này bạn có domain riêng
                 )
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                 .allowedHeaders("*")
                 .allowCredentials(true);
     }
 }
-
