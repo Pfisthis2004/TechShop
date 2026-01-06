@@ -4,7 +4,12 @@ WORKDIR /app
 
 COPY pom.xml .
 COPY mvnw .
+COPY mvnw.cmd .
 COPY .mvn .mvn
+
+# 🔥 FIX QUYỀN CHẠY mvnw
+RUN chmod +x mvnw
+
 RUN ./mvnw dependency:go-offline
 
 COPY src src
