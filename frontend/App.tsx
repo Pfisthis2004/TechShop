@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect, useRef } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -19,16 +20,16 @@ import AdminReports from './pages/Admin/Reports';
 import ChatbotSettings from './pages/Admin/ChatbotSettings';
 import AIChatbot from './components/AIChatbot';
 import { Product, CartItem } from './types';
-import {
-  LayoutDashboard,
-  Package,
-  ShoppingCart as CartIcon,
-  Users,
-  Tag,
-  BarChart3,
+import { StorageService } from './services/storage';
+import { 
+  LayoutDashboard, 
+  Package, 
+  ShoppingCart as CartIcon, 
+  Users, 
+  Tag, 
+  BarChart3, 
   LogOut,
-  MessageSquare,
-  ChevronLeft
+  MessageSquare
 } from 'lucide-react';
 
 const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -60,8 +61,8 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 key={item.path}
                 to={item.path}
                 className={`flex items-center gap-4 px-6 py-4 rounded-[1.25rem] transition-all duration-300 relative group ${
-                  isActive
-                  ? 'bg-red-600 text-white shadow-xl shadow-red-600/20'
+                  isActive 
+                  ? 'bg-red-600 text-white shadow-xl shadow-red-600/20' 
                   : 'text-slate-400 hover:bg-white/5 hover:text-white'
                 }`}
               >
@@ -82,7 +83,7 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               <p className="text-[10px] text-slate-500 truncate font-bold uppercase">{user?.email}</p>
             </div>
           </div>
-          <button
+          <button 
             onClick={logout}
             className="flex items-center gap-4 w-full px-6 py-4 text-slate-400 hover:text-red-400 hover:bg-red-400/10 rounded-2xl transition-all duration-300 group"
           >
@@ -105,17 +106,39 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   );
 };
 
-const App: React.FC = () => {
+// Component con để quản lý State và Logic giỏ hàng theo User
+const AppContent: React.FC = () => {
+  const { user } = useAuth();
   const [cart, setCart] = useState<CartItem[]>([]);
+  const isInitialLoad = useRef(true);
+
+  // 1. Nạp giỏ hàng từ LocalStorage khi User thay đổi (Login/Logout)
+  useEffect(() => {
+    const userId = user?._id;
+    const savedCart = StorageService.getCart(userId);
+    setCart(savedCart);
+    // Đặt ref về true để effect lưu (ở dưới) không chạy ngay khi vừa nạp dữ liệu cũ lên
+    isInitialLoad.current = true;
+  }, [user?._id]);
+
+  // 2. Lưu giỏ hàng vào LocalStorage mỗi khi có thay đổi trong state cart
+  useEffect(() => {
+    // Bỏ qua lần render đầu tiên ngay sau khi nạp dữ liệu từ LocalStorage
+    if (isInitialLoad.current) {
+      isInitialLoad.current = false;
+      return;
+    }
+    const userId = user?._id;
+    StorageService.setCart(userId, cart);
+  }, [cart, user?._id]);
 
   const addToCart = (product: Product) => {
     setCart(prev => {
-      // Fix: Changed product.id to product._id and ensured productId is included in the added item
       const existing = prev.find(item => item.product._id === product._id);
       if (existing) {
-        return prev.map(item =>
-          item.product._id === product._id
-            ? { ...item, quantity: item.quantity + 1 }
+        return prev.map(item => 
+          item.product._id === product._id 
+            ? { ...item, quantity: item.quantity + 1 } 
             : item
         );
       }
@@ -124,114 +147,53 @@ const App: React.FC = () => {
   };
 
   const updateQuantity = (id: string, delta: number) => {
-    setCart(prev => prev.map(item =>
-      // Fix: Changed item.product.id to item.product._id
-      item.product._id === id
-        ? { ...item, quantity: Math.max(1, item.quantity + delta) }
+    setCart(prev => prev.map(item => 
+      item.product._id === id 
+        ? { ...item, quantity: Math.max(1, item.quantity + delta) } 
         : item
     ));
   };
 
   const removeFromCart = (id: string) => {
-    // Fix: Changed item.product.id to item.product._id
     setCart(prev => prev.filter(item => item.product._id !== id));
   };
 
-  const clearCart = () => setCart([]);
+  const clearCart = () => {
+    setCart([]);
+    StorageService.removeCart(user?._id);
+  };
 
   return (
+    <Router>
+      <Routes>
+        {/* Client Routes */}
+        <Route path="/" element={<><Navbar cartCount={cart.length} /><Home onAddToCart={addToCart} /><AIChatbot /></>} />
+        <Route path="/product/:id" element={<><Navbar cartCount={cart.length} /><ProductDetail onAddToCart={addToCart} /><AIChatbot /></>} />
+        <Route path="/cart" element={<><Navbar cartCount={cart.length} /><Cart items={cart} onUpdateQuantity={updateQuantity} onRemove={removeFromCart} /><AIChatbot /></>} />
+        <Route path="/checkout" element={<ProtectedRoute allowedRoles={['USER', 'ADMIN']}><Navbar cartCount={cart.length} /><Checkout onClearCart={clearCart} /><AIChatbot /></ProtectedRoute>} />
+        <Route path="/profile" element={<ProtectedRoute allowedRoles={['USER', 'ADMIN']}><Navbar cartCount={cart.length} /><Profile /><AIChatbot /></ProtectedRoute>} />
+        <Route path="/orders-history" element={<ProtectedRoute allowedRoles={['USER', 'ADMIN']}><Navbar cartCount={cart.length} /><OrdersHistory /><AIChatbot /></ProtectedRoute>} />
+        <Route path="/login" element={<Login />} />
+
+        {/* Admin Routes */}
+        <Route path="/admin" element={<ProtectedRoute allowedRoles={['ADMIN']}><AdminLayout><Dashboard /></AdminLayout></ProtectedRoute>} />
+        <Route path="/admin/products" element={<ProtectedRoute allowedRoles={['ADMIN']}><AdminLayout><AdminProducts /></AdminLayout></ProtectedRoute>} />
+        <Route path="/admin/promotions" element={<ProtectedRoute allowedRoles={['ADMIN']}><AdminLayout><AdminPromotions /></AdminLayout></ProtectedRoute>} />
+        <Route path="/admin/orders" element={<ProtectedRoute allowedRoles={['ADMIN']}><AdminLayout><AdminOrders /></AdminLayout></ProtectedRoute>} />
+        <Route path="/admin/users" element={<ProtectedRoute allowedRoles={['ADMIN']}><AdminLayout><AdminUsers /></AdminLayout></ProtectedRoute>} />
+        <Route path="/admin/reports" element={<ProtectedRoute allowedRoles={['ADMIN']}><AdminLayout><AdminReports /></AdminLayout></ProtectedRoute>} />
+        <Route path="/admin/chatbot" element={<ProtectedRoute allowedRoles={['ADMIN']}><AdminLayout><ChatbotSettings /></AdminLayout></ProtectedRoute>} />
+        
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Router>
+  );
+};
+
+const App: React.FC = () => {
+  return (
     <AuthProvider>
-      <Router>
-        <Routes>
-          {/* User Routes */}
-          <Route path="/" element={
-            <>
-              <Navbar cartCount={cart.length} />
-              <Home onAddToCart={addToCart} />
-              <AIChatbot />
-            </>
-          } />
-          <Route path="/product/:id" element={
-            <>
-              <Navbar cartCount={cart.length} />
-              <ProductDetail onAddToCart={addToCart} />
-              <AIChatbot />
-            </>
-          } />
-          <Route path="/cart" element={
-            <>
-              <Navbar cartCount={cart.length} />
-              <Cart
-                items={cart}
-                onUpdateQuantity={updateQuantity}
-                onRemove={removeFromCart}
-              />
-              <AIChatbot />
-            </>
-          } />
-          <Route path="/checkout" element={
-            <ProtectedRoute allowedRoles={['USER', 'ADMIN']}>
-              <Navbar cartCount={cart.length} />
-              <Checkout onClearCart={clearCart} />
-              <AIChatbot />
-            </ProtectedRoute>
-          } />
-          <Route path="/profile" element={
-            <ProtectedRoute allowedRoles={['USER', 'ADMIN']}>
-              <Navbar cartCount={cart.length} />
-              <Profile />
-              <AIChatbot />
-            </ProtectedRoute>
-          } />
-          <Route path="/orders-history" element={
-            <ProtectedRoute allowedRoles={['USER', 'ADMIN']}>
-              <Navbar cartCount={cart.length} />
-              <OrdersHistory />
-              <AIChatbot />
-            </ProtectedRoute>
-          } />
-          <Route path="/login" element={<Login />} />
-
-          {/* Admin Routes */}
-          <Route path="/admin" element={
-            <ProtectedRoute allowedRoles={['ADMIN']}>
-              <AdminLayout><Dashboard /></AdminLayout>
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/products" element={
-            <ProtectedRoute allowedRoles={['ADMIN']}>
-              <AdminLayout><AdminProducts /></AdminLayout>
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/promotions" element={
-            <ProtectedRoute allowedRoles={['ADMIN']}>
-              <AdminLayout><AdminPromotions /></AdminLayout>
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/orders" element={
-            <ProtectedRoute allowedRoles={['ADMIN']}>
-              <AdminLayout><AdminOrders /></AdminLayout>
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/users" element={
-            <ProtectedRoute allowedRoles={['ADMIN']}>
-              <AdminLayout><AdminUsers /></AdminLayout>
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/reports" element={
-            <ProtectedRoute allowedRoles={['ADMIN']}>
-              <AdminLayout><AdminReports /></AdminLayout>
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/chatbot" element={
-            <ProtectedRoute allowedRoles={['ADMIN']}>
-              <AdminLayout><ChatbotSettings /></AdminLayout>
-            </ProtectedRoute>
-          } />
-
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Router>
+      <AppContent />
     </AuthProvider>
   );
 };

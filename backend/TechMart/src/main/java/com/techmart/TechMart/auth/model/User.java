@@ -1,4 +1,4 @@
-package com.techmart.TechMart.model;
+package com.techmart.TechMart.auth.model;
 
 import lombok.Data;
 import org.springframework.data.annotation.Id;

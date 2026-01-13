@@ -12,8 +12,8 @@ public class CorsConfig implements WebMvcConfigurer {
         registry.addMapping("/api/**")
                 .allowedOriginPatterns(
                         "http://localhost:3000",
-                        "https://*.vercel.app",
-                        "https://techmart.vn" // nếu sau này bạn có domain riêng
+                        "https://*.vercel.app"
+                        // nếu sau này bạn có domain riêng
                 )
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                 .allowedHeaders("*")

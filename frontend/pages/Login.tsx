@@ -1,4 +1,4 @@
-
+// src/pages/Login.tsx
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -6,10 +6,12 @@ import { Mail, Lock, User as UserIcon, ArrowRight } from 'lucide-react';
 
 const Login: React.FC = () => {
   const [isLogin, setIsLogin] = useState(true);
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState(''); // email hoặc username
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
-  const { login } = useAuth();
+  const [phone, setPhone] = useState('');
+  const [address, setAddress] = useState('');
+  const { login, register } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -17,9 +19,24 @@ const Login: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const role = email.includes('admin') ? 'ADMIN' : 'USER';
-    await login(email, role);
-    navigate(from, { replace: true });
+    try {
+      if (isLogin) {
+        await login(identifier, password);
+        navigate(from, { replace: true });
+      } else {
+        await register({
+          name,
+          email: identifier,
+          password,
+          phone,
+          address,
+        });
+        alert('Đăng ký thành công. Vui lòng đăng nhập.');
+        setIsLogin(true);
+      }
+    } catch (err: any) {
+      alert(err?.message || 'Có lỗi xảy ra, vui lòng thử lại');
+    }
   };
 
   return (
@@ -60,12 +77,12 @@ const Login: React.FC = () => {
                   required
                   className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-red-600/20 focus:border-red-600 focus:bg-white transition-all font-semibold text-black placeholder:text-slate-400"
                   placeholder="admin@techmart.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
                 />
               </div>
               {isLogin && (
-                <p className="mt-2 text-[10px] text-slate-400 font-bold uppercase tracking-tight">Gợi ý: Nhập "admin" trong email để test quyền Admin</p>
+                <p className="mt-2 text-[10px] text-slate-400 font-bold uppercase tracking-tight"></p>
               )}
             </div>
 
@@ -83,6 +100,31 @@ const Login: React.FC = () => {
                 />
               </div>
             </div>
+
+            {!isLogin && (
+              <>
+                <div>
+                  <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">Số điện thoại</label>
+                  <input
+                    type="text"
+                    className="w-full pl-4 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl focus:outline-none transition-all"
+                    placeholder="0123456789"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">Địa chỉ</label>
+                  <input
+                    type="text"
+                    className="w-full pl-4 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl focus:outline-none transition-all"
+                    placeholder="Hà Nội"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                  />
+                </div>
+              </>
+            )}
 
             {isLogin && (
               <div className="flex justify-end">

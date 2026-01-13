@@ -1,71 +1,154 @@
-
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, Role } from '../types';
-import { StorageService } from '../services/storage';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+} from "react";
+import { User, Role } from "../types";
+import { StorageService } from "../services/storage";
+import { AuthAPI } from "../services/api";
+import axios from "axios";
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, role: Role) => Promise<void>;
+  token: string | null;
+  login: (identifier: string, password: string) => Promise<void>;
+  register: (payload: {
+    name: string;
+    email: string;
+    password: string;
+    phone?: string;
+    address?: string;
+  }) => Promise<void>;
   logout: () => void;
   isLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+/* ================= Utils ================= */
+
+function parseJwt(token: string): any | null {
+  try {
+    const payload = token.split(".")[1];
+    const decoded = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
+    return JSON.parse(decodeURIComponent(escape(decoded)));
+  } catch {
+    return null;
+  }
+}
+
+/* ================= Provider ================= */
+
+export const AuthProvider: React.FC<{ children: ReactNode }> = ({
+  children,
+}) => {
   const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // useEffect dùng để kiểm tra trạng thái đăng nhập khi ứng dụng khởi chạy
   useEffect(() => {
+    const savedToken = StorageService.getToken();
     const savedUser = StorageService.getUser();
-    const token = StorageService.getToken();
-    
-    if (savedUser && token) {
+
+    if (savedToken && savedUser) {
+      setToken(savedToken);
       setUser(savedUser);
     }
     setIsLoading(false);
   }, []);
 
-  const login = async (email: string, role: Role) => {
-    setIsLoading(true);
-    
-    // Giả lập gọi API login bằng axios
-    try {
-      // Trong thực tế sẽ là: const response = await api.post('/auth/login', { email, password });
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const mockUser = role === 'ADMIN' ? MOCK_ADMIN : MOCK_USER;
-      const mockJWT = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."; // Token giả lập
+  const saveSession = (jwt: string) => {
+    const payload = parseJwt(jwt) || {};
 
-      // Lưu trữ bằng StorageService
-      StorageService.setUser(mockUser);
-      StorageService.setToken(mockJWT);
-      
-      setUser(mockUser);
-    } catch (error) {
-      console.error("Login failed", error);
+    const role: Role = payload.role || "USER";
+    const email: string = payload.sub || payload.email || "";
+
+    const sessionUser: User = {
+      _id: payload.id || payload.sub || "",
+      name: payload.name || payload.username || email.split("@")[0],
+      email,
+      role,
+      phone: payload.phone || "",
+      address: payload.address || "",
+      avatar: payload.avatar || "",
+      isActive: payload.isActive ?? true,
+    };
+
+    StorageService.setToken(jwt);
+    StorageService.setUser(sessionUser);
+    setToken(jwt);
+    setUser(sessionUser);
+  };
+
+  /* ================= LOGIN ================= */
+
+  const login = async (identifier: string, password: string) => {
+    setIsLoading(true);
+    try {
+      const isAdmin = identifier.toLowerCase().includes("admin");
+      const apiCall = isAdmin ? AuthAPI.adminLogin : AuthAPI.login;
+
+      const res = await apiCall({ identifier, password });
+
+      if (!res.data?.token) {
+        throw new Error("Token không tồn tại");
+      }
+
+      saveSession(res.data.token);
+    } catch (err) {
+      if (axios.isAxiosError(err)) {
+        throw err;
+      }
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  /* ================= REGISTER ================= */
+
+  const register = async (payload: {
+    name: string;
+    email: string;
+    password: string;
+    phone?: string;
+    address?: string;
+  }) => {
+    setIsLoading(true);
+    try {
+      const body = {
+        username: payload.name ?? payload.email.split("@")[0],
+        email: payload.email,
+        password: payload.password,
+        phone: payload.phone,
+        address: payload.address,
+      };
+
+      await AuthAPI.register(body);
     } finally {
       setIsLoading(false);
     }
   };
 
   const logout = () => {
-    setUser(null);
     StorageService.clearAll();
+    setUser(null);
+    setToken(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isLoading }}>
+    <AuthContext.Provider
+      value={{ user, token, login, register, logout, isLoading }}
+    >
       {children}
     </AuthContext.Provider>
   );
 };
 
 export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error("useAuth must be used within AuthProvider");
+  return ctx;
 };

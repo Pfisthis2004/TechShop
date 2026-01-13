@@ -1,4 +1,4 @@
-package com.techmart.TechMart.DTO;
+package com.techmart.TechMart.auth.DTO;
 
 import lombok.Data;
 

@@ -8,37 +8,22 @@ const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL,
   headers: { "ngrok-skip-browser-warning": "true" }
 });
-/*
-// 2. Request Interceptor: Tự động thêm Token vào Header
-api.interceptors.request.use(
-  (config) => {
-    const token = StorageService.getToken();
-    if (token && config.headers) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
 
-// 3. Response Interceptor: Xử lý khi Token hết hạn (401)
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      StorageService.clearAll();
-      window.location.href = '/login';
-    }
-    return Promise.reject(error);
+// 🔐 Tự động gắn JWT
+api.interceptors.request.use((config) => {
+  const token = StorageService.getToken();
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
   }
-);
-*/
-// --- Cấu trúc API tương ứng với các Controller trong Spring Boot ---
+  return config;
+});
 
 export const AuthAPI = {
-  login: (credentials: any) => api.post('/auth/login', credentials),
-  register: (userData: any) => api.post('/auth/register', userData),
+  login: (data: any) => api.post("/auth/login", data),
+  adminLogin: (data: any) => api.post("/auth/admin-login", data),
+  register: (data: any) => api.post("/auth/register", data),
 };
+
 
 export const ProductAPI = {
   // 1. Lấy tất cả (có hỗ trợ truyền params như page, limit nếu sau này làm phân trang)

@@ -1,5 +1,4 @@
-
-export type Role = 'USER' | 'ADMIN' | 'STAFF';
+export type Role = 'USER' | 'ADMIN';
 
 export interface User {
   _id: string; // MongoDB ObjectID
@@ -11,9 +10,8 @@ export interface User {
   address?: string;
   avatar?: string;
   isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
 }
+
 
 export interface Category {
   id: string;
