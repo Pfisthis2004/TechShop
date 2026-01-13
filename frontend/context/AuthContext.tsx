@@ -1,7 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User, Role } from '../types';
-import { MOCK_ADMIN, MOCK_USER } from '../services/mockData';
 import { StorageService } from '../services/storage';
 
 interface AuthContextType {

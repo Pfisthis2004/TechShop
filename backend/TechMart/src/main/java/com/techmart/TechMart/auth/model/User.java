@@ -2,17 +2,19 @@ package com.techmart.TechMart.model;
 
 import lombok.Data;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 @Data
 @Document(collection = "users")
 public class User {
     @Id private String id;
-    private String name;
-    private String email;
-    private String role;
+    @Indexed(unique = true) private String email;
+    @Indexed(unique = true) private String username;
+    private String password;
+    private Role role = Role.USER; // mặc định là USER
+    private boolean isActive = true;
     private String phone;
     private String address;
-    private boolean isActive;
     private String avatar;
-    private String password;
 }
+
